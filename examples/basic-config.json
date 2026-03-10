@@ -1,0 +1,59 @@
+{
+  "pluginName": "MyCustomIndicators",
+  "pluginDescription": "自定义技术指标插件 - 包含MA、EMA、RSI等常用指标",
+  "functions": [
+    {
+      "id": 1,
+      "name": "MyMA",
+      "description": "自定义N日移动平均线",
+      "formulaType": "MA",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 10,
+          "description": "均线周期，默认10日"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "MyEMA",
+      "description": "自定义N日指数移动平均线",
+      "formulaType": "EMA",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 12,
+          "description": "EMA周期，默认12日"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "MyRSI",
+      "description": "相对强弱指标RSI",
+      "formulaType": "RSI",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 14,
+          "description": "RSI周期，默认14日"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "MyMACD",
+      "description": "MACD指标",
+      "formulaType": "MACD",
+      "parameters": []
+    }
+  ],
+  "security": {
+    "enableTimeLimit": false,
+    "expireYear": 2026,
+    "enableDeviceBinding": false,
+    "enableOnlineVerify": false,
+    "verifyUrl": null
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "pluginName": "CustomStrategy",
+  "pluginDescription": "自定义交易策略 - 使用自定义代码",
+  "functions": [
+    {
+      "id": 1,
+      "name": "MyStrategy",
+      "description": "自定义交易策略",
+      "formulaType": "CUSTOM",
+      "parameters": [
+        {
+          "name": "param1",
+          "defaultValue": 10,
+          "description": "参数1"
+        }
+      ],
+      "customCode": "    // 自定义策略实现\n    int threshold = (int)pfIn2[0];\n    if (threshold <= 0) threshold = 10;\n    \n    for (int i = 0; i < nDataLen; i++)\n    {\n        // 示例: 计算价格与均线的偏离\n        float price = pfIn1[i];\n        float avg = 0;\n        int count = 0;\n        for (int j = i; j >= 0 && j > i - threshold; j--)\n        {\n            avg += pfIn1[j];\n            count++;\n        }\n        if (count > 0) avg /= count;\n        \n        // 输出偏离率\n        pfOut[i] = (price - avg) / avg * 100;\n    }"
+    }
+  ],
+  "security": {
+    "enableTimeLimit": false,
+    "expireYear": 2026,
+    "enableDeviceBinding": false,
+    "enableOnlineVerify": false,
+    "verifyUrl": null
+  }
+}

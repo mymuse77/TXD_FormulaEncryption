@@ -1,0 +1,39 @@
+{
+  "pluginName": "PremiumIndicators",
+  "pluginDescription": "高级指标插件 - 带时间限制和网络验证",
+  "functions": [
+    {
+      "id": 1,
+      "name": "PremiumMA",
+      "description": "高级均线指标",
+      "formulaType": "MA",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 20,
+          "description": "均线周期"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "PremiumEMA",
+      "description": "高级EMA指标",
+      "formulaType": "EMA",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 26,
+          "description": "EMA周期"
+        }
+      ]
+    }
+  ],
+  "security": {
+    "enableTimeLimit": true,
+    "expireYear": 2025,
+    "enableDeviceBinding": true,
+    "enableOnlineVerify": true,
+    "verifyUrl": "https://your-server.com/api/verify"
+  }
+}
