@@ -20,6 +20,9 @@ dotnet test
 ```bash
 dotnet test --filter "ConfigLoaderTests"
 dotnet test --filter "ModelsTests"
+dotnet test --filter "CppCodeGeneratorTests"
+dotnet test --filter "ProgramTests"
+dotnet test --filter "IntegrationTests"
 ```
 
 ### 带覆盖率运行
@@ -35,7 +38,9 @@ tests/
 └── TdxDllGenerator.Tests/
     ├── ConfigLoaderTests.cs    # 配置加载器测试
     ├── ModelsTests.cs          # 数据模型测试
-    └── UnitTest1.cs            # 示例测试
+    ├── CppCodeGeneratorTests.cs # C++代码生成器测试
+    ├── ProgramTests.cs         # 命令行参数测试
+    └── IntegrationTests.cs     # 集成测试
 ```
 
 ## 编写新测试
@@ -93,12 +98,13 @@ public class MyClassTests
 |---|---------|------|
 | ConfigLoader | ConfigLoaderTests.cs | ✓ |
 | Models | ModelsTests.cs | ✓ |
-| CppCodeGenerator | 待添加 | - |
-| Program | 待添加 | - |
+| CppCodeGenerator | CppCodeGeneratorTests.cs | ✓ |
+| Program | ProgramTests.cs | ✓ |
+| 集成测试 | IntegrationTests.cs | ✓ |
 
 ## 待办事项
 
-- [ ] 添加 CppCodeGenerator 测试
-- [ ] 添加 Program 命令行参数测试
-- [ ] 添加集成测试
+- [x] 添加 CppCodeGenerator 测试
+- [x] 添加 Program 命令行参数测试
+- [x] 添加集成测试
 - [ ] 配置 CI/CD 自动化测试
