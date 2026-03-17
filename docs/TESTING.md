@@ -107,4 +107,4 @@ public class MyClassTests
 - [x] 添加 CppCodeGenerator 测试
 - [x] 添加 Program 命令行参数测试
 - [x] 添加集成测试
-- [ ] 配置 CI/CD 自动化测试
+- [x] 配置 CI/CD 自动化测试 (详见 CICD.md)
