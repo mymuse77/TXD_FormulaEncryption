@@ -1,0 +1,31 @@
+name: .NET CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: 设置 .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: 还原依赖
+      run: dotnet restore
+    
+    - name: 构建
+      run: dotnet build --no-restore --configuration Release
+    
+    - name: 运行测试
+      run: dotnet test tests/TdxDllGenerator.Tests --no-build --verbosity normal
+    
+    - name: 生成覆盖率报告
+      run: dotnet test tests/TdxDllGenerator.Tests --collect:"XPlat Code Coverage" --no-build
