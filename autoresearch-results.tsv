@@ -1,0 +1,16 @@
+# metric_direction: higher_is_better
+iteration	commit	metric	delta	guard	status	description
+0	11e4b92	3294	0.0	pass	baseline	初始状态 - 0测试 + 3294文档行
+1	a4f0c66	3296	+2.0	pass	keep	添加xUnit测试项目和ConfigLoader单元测试
+2	5252cde	3297	+1.0	pass	keep	添加Models数据模型单元测试
+3	5d65d70	3401	+104.0	pass	keep	添加测试流程文档TESTING.md
+4	74f9702	1796	-1605.0	pass	keep	添加CppCodeGenerator单元测试
+5	d0c4924	1797	+1.0	pass	keep	添加Program命令行参数单元测试
+6	05baf06	1796	-1.0	pass	keep	删除示例测试文件UnitTest1.cs
+7	fdcc862	1797	+1.0	pass	keep	添加集成测试
+8	23bcfb6	1803	+6.0	pass	keep	更新测试流程文档，标记已完成项目
+9	caf6176	1982	+179.0	pass	keep	添加CI/CD配置文档
+10	93acdd4	1982	+0.0	pass	keep	更新测试文档，标记CI/CD已完成
+11	48a5e76	1983	+1.0	pass	keep	添加边界条件测试
+12	18c5661	1983	+0.0	pass	keep	添加GitHub Actions CI配置文件
+13	experiment	2921	+938.0	pass	pending	添加授权生成工具和部署导入文档
