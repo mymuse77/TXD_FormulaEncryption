@@ -140,6 +140,20 @@ public class CppCodeGenerator
         sb.AppendLine("pPluginFUNC g_pFuncCallBack = NULL;");
         sb.AppendLine();
 
+        // 检查是否有 useGlobalData 的函数，需要生成全局数据缓冲区
+        bool needsGlobalData = _config.Functions.Any(f => f.UseGlobalData);
+        if (needsGlobalData)
+        {
+            sb.AppendLine("// ==================== 全局数据缓冲区 ====================");
+            sb.AppendLine("// 用于多步数据加载：DATALOADER函数存储数据，计算函数从全局数组读取");
+            sb.AppendLine("static std::vector<float> g_buf_close;  // CLOSE/C");
+            sb.AppendLine("static std::vector<float> g_buf_open;   // OPEN/O");
+            sb.AppendLine("static std::vector<float> g_buf_high;   // HIGH/H");
+            sb.AppendLine("static std::vector<float> g_buf_low;    // LOW/L");
+            sb.AppendLine("static std::vector<float> g_buf_vol;    // VOL/V");
+            sb.AppendLine();
+        }
+
         // 生成各个函数
         foreach (var func in _config.Functions)
         {
@@ -946,6 +960,9 @@ public class CppCodeGenerator
                 sb.AppendLine("        pfOut[i] = ObfuscateResult(pfOut[i]);");
                 sb.AppendLine("    }");
                 break;
+            case "DATALOADER":
+                GenerateDataLoaderCode(sb, func);
+                break;
             case "EXPRESSION":
                 GenerateExpressionCode(sb, func);
                 break;
@@ -969,6 +986,31 @@ public class CppCodeGenerator
     }
 
     /// <summary>
+    /// 生成数据加载函数代码（DATALOADER类型）
+    /// 用于将通达信传入的数据存储到全局缓冲区
+    /// </summary>
+    private void GenerateDataLoaderCode(StringBuilder sb, FunctionConfig func)
+    {
+        if (!string.IsNullOrEmpty(func.CustomCode))
+        {
+            sb.AppendLine(func.CustomCode);
+        }
+        else
+        {
+            // 默认数据加载逻辑：pfIn1→g_buf_close, pfIn2→g_buf_open, pfIn3→g_buf_high
+            sb.AppendLine("    // 数据加载到全局缓冲区");
+            sb.AppendLine("    if (nDataLen <= 0 || pfIn1 == nullptr) return;");
+            sb.AppendLine("    g_buf_close.assign(pfIn1, pfIn1 + nDataLen);");
+            sb.AppendLine("    if (pfIn2) g_buf_open.assign(pfIn2, pfIn2 + nDataLen);");
+            sb.AppendLine("    else g_buf_open.assign(nDataLen, 0.0f);");
+            sb.AppendLine("    if (pfIn3) g_buf_high.assign(pfIn3, pfIn3 + nDataLen);");
+            sb.AppendLine("    else g_buf_high.assign(nDataLen, 0.0f);");
+            sb.AppendLine("    // 输出0（此函数仅加载数据，不产生有效输出）");
+            sb.AppendLine("    for (int i = 0; i < nDataLen; i++) pfOut[i] = 0.0f;");
+        }
+    }
+
+    /// <summary>
     /// 生成表达式代码
     /// </summary>
     private void GenerateExpressionCode(StringBuilder sb, FunctionConfig func)
@@ -982,12 +1024,15 @@ public class CppCodeGenerator
 
         try
         {
+            // 预处理表达式（移除注释、绘图函数、颜色常量）
+            var preprocessed = ExpressionParser.Preprocess(func.Expression);
+            
             // 解析表达式
             var parser = new ExpressionParser();
-            var ast = parser.Parse(func.Expression);
+            var ast = parser.Parse(preprocessed);
 
             // 生成代码
-            var generator = new ExpressionCodeGenerator(func.Name);
+            var generator = new ExpressionCodeGenerator(func.Name, func.UseGlobalData);
             var code = generator.GenerateFunctionCode(ast);
 
             // 输出代码

@@ -463,7 +463,7 @@ cmake --build . --config Release
 
 ```cmd
 cd output
-C:\mingw64\bin\g++.exe -shared -o MyStrategy.dll MyStrategy.cpp MyStrategy.def -m32 -O2 -static-libgcc -static-libstdc++
+C:\mingw64\bin\g++.exe -shared -o MyTest.dll MyTest.cpp MyTest.def -m32 -O2 -static-libgcc -static-libstdc++
 ```
 
 ### 7.5 验证 DLL

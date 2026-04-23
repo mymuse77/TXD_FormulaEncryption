@@ -1,0 +1,11 @@
+; MyTest.def
+; 模块定义文件 - 通达信DLL插件
+
+LIBRARY MyTest
+
+EXPORTS
+    ; 通达信插件入口函数
+    RegisterTdxFunc @1
+
+    ; DLL入口点 (可选，但建议保留)
+    DllMain PRIVATE

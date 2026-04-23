@@ -49,6 +49,14 @@ public class FunctionConfig
 
     [JsonPropertyName("expression")]
     public string? Expression { get; set; }
+
+    /// <summary>
+    /// 是否使用全局数据缓冲区（当公式需要超过3个数据输入时使用）
+    /// true时，C/O/H/L/V 从全局数组读取而非 pfIn1/pfIn2/pfIn3
+    /// 需配合 DATALOADER 类型的函数预先加载数据
+    /// </summary>
+    [JsonPropertyName("useGlobalData")]
+    public bool UseGlobalData { get; set; }
 }
 
 /// <summary>

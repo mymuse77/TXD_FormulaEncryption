@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace TdxDllGenerator;
 
@@ -35,11 +36,14 @@ public class ExpressionParseException : Exception
 public enum AstNodeType
 {
     Number,         // 数字常量
-    Identifier,     // 标识符 (CLOSE, HIGH等)
+    StringLiteral,  // 字符串常量
+    Identifier,     // 标识符 (CLOSE, HIGH, 用户变量等)
     FunctionCall,   // 函数调用
     BinaryOp,       // 二元运算
     UnaryOp,        // 一元运算
-    Parameter       // 参数引用
+    Parameter,      // 参数引用
+    StatementList,  // 语句列表 (分号分隔)
+    Assignment,     // 赋值语句 (VAR:=expr)
 }
 
 /// <summary>
@@ -65,11 +69,14 @@ public class AstNode
         return Type switch
         {
             AstNodeType.Number => $"Number({Value})",
+            AstNodeType.StringLiteral => $"String({Value})",
             AstNodeType.Identifier => $"Identifier({Value})",
             AstNodeType.FunctionCall => $"FunctionCall({FunctionName})",
             AstNodeType.BinaryOp => $"BinaryOp({Operator})",
             AstNodeType.UnaryOp => $"UnaryOp({Operator})",
             AstNodeType.Parameter => $"Parameter({Value})",
+            AstNodeType.StatementList => $"StatementList({Children.Count} stmts)",
+            AstNodeType.Assignment => $"Assignment({Value}:=)",
             _ => $"{Type}"
         };
     }
@@ -97,7 +104,7 @@ public class ExpressionFunction
 }
 
 /// <summary>
-/// 通达信风格表达式解析器
+/// 通达信风格表达式解析器 - 支持多行赋值语句
 /// </summary>
 public class ExpressionParser
 {
@@ -105,6 +112,29 @@ public class ExpressionParser
     private int _position = 0;
     private int _line = 1;
     private int _column = 1;
+
+    // 用户定义的变量集合（在多语句解析中累积）
+    private readonly HashSet<string> _userVariables = new(StringComparer.OrdinalIgnoreCase);
+
+    // 需要过滤的绘图函数
+    private static readonly HashSet<string> DrawFunctions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "DRAWICON", "DRAWKLINE", "STICKLINE", "DRAWSL", "DRAWTEXT_FIX",
+        "DRAWLINE", "DRAWNUMBER", "DRAWTEXT", "DRAWRECTREL"
+    };
+
+    // 需要过滤的颜色常量前缀
+    private static readonly Regex ColorRegex = new(@"\bCOLOR\w+\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // 需要过滤的绘图修饰符
+    private static readonly Regex NodrawModifierRegex = new(@",?\s*\bNODRAW\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex LinethickRegex = new(@"\bLINETHICK\d*\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PointdotRegex = new(@"\bPOINTDOT\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex CircledotRegex = new(@"\bCIRCLEDOT\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex CrossdotRegex = new(@"\bCROSSDOT\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex StickRegex = new(@"\bSTICK\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex VolstickRegex = new(@"\bVOLSTICK\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ColorstickRegex = new(@"\bCOLORSTICK\b\s*,?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // 支持的函数表
     public static readonly Dictionary<string, ExpressionFunction> Functions = new(StringComparer.OrdinalIgnoreCase)
@@ -163,6 +193,13 @@ public class ExpressionParser
         ["EXIST"] = new("EXIST", 2, 2, "存在"),
         ["EVERY"] = new("EVERY", 2, 2, "一直存在"),
         ["BARSLAST"] = new("BARSLAST", 1, 1, "上次条件成立位置"),
+        ["BARSLASTCOUNT"] = new("BARSLASTCOUNT", 1, 1, "连续满足条件的周期数"),
+
+        // 环境/系统函数
+        ["CODELIKE"] = new("CODELIKE", 1, 1, "检测股票代码前缀"),
+        ["ZTPRICE"] = new("ZTPRICE", 2, 2, "涨停价"),
+        ["DTPRICE"] = new("DTPRICE", 2, 2, "跌停价"),
+        ["NODRAW"] = new("NODRAW", 1, 1, "绘图修饰符（返回原值）"),
     };
 
     // 运算符优先级
@@ -188,7 +225,121 @@ public class ExpressionParser
     };
 
     /// <summary>
-    /// 解析表达式
+    /// 预处理通达信公式 - 移除注释、绘图函数、颜色常量、绘图修饰符
+    /// </summary>
+    public static string Preprocess(string formula)
+    {
+        if (string.IsNullOrWhiteSpace(formula))
+            return "";
+
+        var result = formula;
+
+        // 1. 移除 {注释}
+        var sb = new StringBuilder();
+        int depth = 0;
+        for (int i = 0; i < result.Length; i++)
+        {
+            if (result[i] == '{') { depth++; continue; }
+            if (result[i] == '}') { depth = Math.Max(0, depth - 1); continue; }
+            if (depth == 0) sb.Append(result[i]);
+        }
+        result = sb.ToString();
+
+        // 2. 移除绘图函数调用（从函数名到匹配的右括号）
+        foreach (var funcName in DrawFunctions)
+        {
+            result = RemoveFunctionCall(result, funcName);
+        }
+
+        // 3. 移除颜色常量
+        result = ColorRegex.Replace(result, "");
+
+        // 4. 移除绘图修饰符（NODRAW, LINETHICK, POINTDOT, CIRCLEDOT, CROSSDOT, STICK, VOLSTICK, COLORSTICK）
+        result = NodrawModifierRegex.Replace(result, "");
+        result = LinethickRegex.Replace(result, "");
+        result = PointdotRegex.Replace(result, "");
+        result = CircledotRegex.Replace(result, "");
+        result = CrossdotRegex.Replace(result, "");
+        result = StickRegex.Replace(result, "");
+        result = VolstickRegex.Replace(result, "");
+        result = ColorstickRegex.Replace(result, "");
+
+        // 5. 移除逗号残留（颜色/修饰符被移除后可能残留）- 循环清理直到无变化
+        string prev;
+        do
+        {
+            prev = result;
+            result = Regex.Replace(result, @",\s*;", ";");
+            result = Regex.Replace(result, @",\s*$", "");
+        } while (result != prev);
+
+        // 6. 清理多余空白和连续分号
+        result = Regex.Replace(result, @"\s+", " ");
+        result = Regex.Replace(result, @";\s*;+", ";");  // 连续分号合并为一个
+
+        return result.Trim();
+    }
+
+    /// <summary>
+    /// 移除指定函数的完整调用（含括号匹配）
+    /// </summary>
+    private static string RemoveFunctionCall(string text, string funcName)
+    {
+        while (true)
+        {
+            var upperText = text.ToUpperInvariant();
+            int idx = -1;
+
+            for (int i = 0; i <= upperText.Length - funcName.Length; i++)
+            {
+                if (upperText.Substring(i, funcName.Length) == funcName)
+                {
+                    bool wordStart = (i == 0 || !char.IsLetterOrDigit(text[i - 1]) && text[i - 1] != '_');
+                    bool wordEnd = (i + funcName.Length >= text.Length || !char.IsLetterOrDigit(text[i + funcName.Length]) && text[i + funcName.Length] != '_');
+                    if (wordStart && wordEnd)
+                    {
+                        idx = i;
+                        break;
+                    }
+                }
+            }
+
+            if (idx < 0) break;
+
+            int parenStart = idx + funcName.Length;
+            while (parenStart < text.Length && char.IsWhiteSpace(text[parenStart])) parenStart++;
+
+            if (parenStart >= text.Length || text[parenStart] != '(')
+            {
+                // 不是函数调用格式，跳过此位置
+                // 在前面插入一个不可见字符防止重复匹配，然后移除
+                text = text.Substring(0, idx) + " " + text.Substring(idx + funcName.Length);
+                continue;
+            }
+
+            // 找到匹配的右括号
+            int pdepth = 1;
+            int parenEnd = parenStart + 1;
+            bool inString = false;
+            while (parenEnd < text.Length && pdepth > 0)
+            {
+                if (text[parenEnd] == '\'' && !inString) inString = true;
+                else if (text[parenEnd] == '\'' && inString) inString = false;
+                else if (!inString)
+                {
+                    if (text[parenEnd] == '(') pdepth++;
+                    else if (text[parenEnd] == ')') pdepth--;
+                }
+                parenEnd++;
+            }
+
+            text = text.Substring(0, idx) + text.Substring(parenEnd);
+        }
+        return text;
+    }
+
+    /// <summary>
+    /// 解析表达式（支持多行赋值）
     /// </summary>
     public AstNode Parse(string expression)
     {
@@ -196,10 +347,20 @@ public class ExpressionParser
         _position = 0;
         _line = 1;
         _column = 1;
+        _userVariables.Clear();
 
         if (string.IsNullOrWhiteSpace(_expression))
         {
             throw new ExpressionParseException("表达式不能为空", 1, 1);
+        }
+
+        // 检查是否包含分号或 :=（多语句模式）
+        bool hasSemicolon = _expression.Contains(';');
+        bool hasAssignment = _expression.Contains(":=");
+
+        if (hasSemicolon || hasAssignment)
+        {
+            return ParseStatementList();
         }
 
         var result = ParseExpression();
@@ -220,8 +381,9 @@ public class ExpressionParser
     {
         try
         {
+            var preprocessed = Preprocess(expression);
             var parser = new ExpressionParser();
-            parser.Parse(expression);
+            parser.Parse(preprocessed);
             error = null;
             return true;
         }
@@ -238,6 +400,180 @@ public class ExpressionParser
     }
 
     /// <summary>
+    /// 解析语句列表 (分号分隔，支持 := 赋值)
+    /// </summary>
+    private AstNode ParseStatementList()
+    {
+        var listNode = new AstNode(AstNodeType.StatementList);
+
+        while (_position < _expression.Length)
+        {
+            SkipWhitespace();
+            if (_position >= _expression.Length) break;
+
+            // 尝试解析赋值语句 VAR:=expr 或 VAR:expr
+            var stmt = ParseStatement();
+            if (stmt != null)
+                listNode.Children.Add(stmt);
+
+            // 跳过分号
+            SkipWhitespace();
+            if (Match(';'))
+            {
+                Consume(";");
+                _column++;
+            }
+        }
+
+        // 如果只有一个语句且不是赋值，直接返回（保持向后兼容）
+        if (listNode.Children.Count == 1 && listNode.Children[0].Type != AstNodeType.Assignment)
+            return listNode.Children[0];
+
+        return listNode;
+    }
+
+    /// <summary>
+    /// 解析单条语句 (赋值或表达式)
+    /// </summary>
+    private AstNode? ParseStatement()
+    {
+        SkipWhitespace();
+        if (_position >= _expression.Length) return null;
+
+        // 检查是否是绘图函数（跳过）
+        if (IsDrawFunctionAtCurrentPosition())
+        {
+            SkipDrawFunctionCall();
+            return null;
+        }
+
+        // 尝试匹配 VAR:=expr 模式
+        var savedPos = _position;
+        var savedCol = _column;
+
+        // 读取标识符
+        if (char.IsLetter(Peek()) || Peek() == '_')
+        {
+            var sb = new StringBuilder();
+            int startPos = _position;
+            while (_position < _expression.Length && (char.IsLetterOrDigit(Peek()) || Peek() == '_'))
+            {
+                sb.Append(Peek());
+                _position++;
+                _column++;
+            }
+
+            var name = sb.ToString().ToUpperInvariant();
+            SkipWhitespace();
+
+            // 检查 := 赋值
+            if (Match(':') && _position + 1 < _expression.Length && _expression[_position + 1] == '=')
+            {
+                Consume(":=");
+                _column += 2;
+
+                // 注册变量
+                _userVariables.Add(name);
+
+                // 解析赋值表达式
+                var expr = ParseExpression();
+
+                var assignNode = new AstNode(AstNodeType.Assignment)
+                {
+                    Value = name,
+                    Line = _line,
+                    Column = savedCol
+                };
+                assignNode.Children.Add(expr);
+                return assignNode;
+            }
+
+            // 检查 : 输出赋值 (VAR:expr)
+            if (Match(':') && (_position + 1 >= _expression.Length || _expression[_position + 1] != '='))
+            {
+                Consume(":");
+                _column++;
+
+                // 注册变量
+                _userVariables.Add(name);
+
+                // 解析赋值表达式
+                var expr = ParseExpression();
+
+                var assignNode = new AstNode(AstNodeType.Assignment)
+                {
+                    Value = name,
+                    Line = _line,
+                    Column = savedCol
+                };
+                assignNode.Children.Add(expr);
+                return assignNode;
+            }
+
+            // 不是赋值，回退
+            _position = savedPos;
+            _column = savedCol;
+        }
+
+        // 普通表达式
+        return ParseExpression();
+    }
+
+    /// <summary>
+    /// 检查当前位置是否是绘图函数
+    /// </summary>
+    private bool IsDrawFunctionAtCurrentPosition()
+    {
+        foreach (var funcName in DrawFunctions)
+        {
+            if (PeekKeyword(funcName))
+            {
+                int afterName = _position + funcName.Length;
+                while (afterName < _expression.Length && char.IsWhiteSpace(_expression[afterName])) afterName++;
+                if (afterName < _expression.Length && _expression[afterName] == '(')
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 跳过绘图函数调用（含括号匹配）
+    /// </summary>
+    private void SkipDrawFunctionCall()
+    {
+        // 跳过函数名
+        while (_position < _expression.Length && (char.IsLetterOrDigit(Peek()) || Peek() == '_'))
+        {
+            _position++;
+            _column++;
+        }
+
+        SkipWhitespace();
+
+        // 跳过括号内容
+        if (Match('('))
+        {
+            Consume("(");
+            _column++;
+            int depth = 1;
+            bool inStr = false;
+            while (_position < _expression.Length && depth > 0)
+            {
+                if (Peek() == '\'' && !inStr) inStr = true;
+                else if (Peek() == '\'' && inStr) inStr = false;
+                else if (!inStr)
+                {
+                    if (Peek() == '(') depth++;
+                    else if (Peek() == ')') depth--;
+                }
+                _position++;
+                _column++;
+            }
+        }
+    }
+
+    /// <summary>
     /// 解析表达式 (支持二元运算)
     /// </summary>
     private AstNode ParseExpression(int minPrecedence = 0)
@@ -249,6 +585,10 @@ public class ExpressionParser
             SkipWhitespace();
 
             if (_position >= _expression.Length)
+                break;
+
+            // 分号表示语句结束
+            if (Peek() == ';')
                 break;
 
             var op = PeekOperator();
@@ -368,6 +708,12 @@ public class ExpressionParser
             return ParseNumber(startLine, startColumn);
         }
 
+        // 字符串字面量 (如 '00', '30', '60')
+        if (Peek() == '\'')
+        {
+            return ParseStringLiteral(startLine, startColumn);
+        }
+
         // 标识符或函数调用
         if (char.IsLetter(Peek()) || Peek() == '_')
         {
@@ -396,6 +742,37 @@ public class ExpressionParser
         }
 
         return new AstNode(AstNodeType.Number)
+        {
+            Value = sb.ToString(),
+            Line = line,
+            Column = column
+        };
+    }
+
+    /// <summary>
+    /// 解析字符串字面量 (如 '00', '30', '60')
+    /// </summary>
+    private AstNode ParseStringLiteral(int line, int column)
+    {
+        Consume("'"); // consume opening quote
+        _column++;
+
+        var sb = new StringBuilder();
+        while (_position < _expression.Length && Peek() != '\'')
+        {
+            sb.Append(Peek());
+            _position++;
+            _column++;
+        }
+
+        if (!Match('\''))
+        {
+            throw new ExpressionParseException("字符串未以单引号关闭", _line, _column);
+        }
+        Consume("'"); // consume closing quote
+        _column++;
+
+        return new AstNode(AstNodeType.StringLiteral)
         {
             Value = sb.ToString(),
             Line = line,
@@ -478,8 +855,19 @@ public class ExpressionParser
             return funcNode;
         }
 
-        // 数据序列或标识符
+        // 数据序列
         if (Functions.TryGetValue(name, out var dataFunc) && dataFunc.IsDataSeries)
+        {
+            return new AstNode(AstNodeType.Identifier)
+            {
+                Value = name,
+                Line = line,
+                Column = column
+            };
+        }
+
+        // 用户定义的变量
+        if (_userVariables.Contains(name))
         {
             return new AstNode(AstNodeType.Identifier)
             {
