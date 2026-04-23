@@ -738,6 +738,34 @@ dotnet run --project src\TdxDllGenerator.csproj -- init -o myconfig.json
 dotnet run --project src\TdxDllGenerator.csproj -- --help
 ```
 
+通达信中使用方法
+核心问题：通达信 DLL 只有 3 个输入（pfIn1/pfIn2/pfIn3），但公式需要 C/O/H/L/V 5 个数据序列。已拆分为 3 步调用。
+
+步骤 1：重新绑定 DLL
+关闭通达信，将新编译的 MyTest.dll 复制到通达信 T0002\dlls\ 目录覆盖旧文件，重新打开通达信。
+
+步骤 2：新建主图指标
+按 Ctrl+F → 技术指标 → 新建，输入以下代码：
+
+{=== 低吸连板前 信号指标 ===}
+{第1步：加载 CLOSE/OPEN/HIGH 到全局缓冲区}
+TDXDLL1(36, CLOSE, OPEN, HIGH);
+{第2步：加载 LOW/VOL 到全局缓冲区}
+TDXDLL1(37, LOW, VOL, 0);
+{第3步：从全局缓冲区计算信号}
+低吸信号: TDXDLL1(38, 0, 0, 0);
+步骤 3：使用
+将此指标设为主图叠加即可。信号输出为 1（有信号）或 0（无信号）。
+
+ID=35 (VolumeWeightedPrice) 使用
+成交量加权价: TDXDLL1(35, CLOSE, VOL, 0);
+关键说明
+DLL函数ID	作用	通达信调用
+36	加载 C/O/H	TDXDLL1(36, CLOSE, OPEN, HIGH)
+37	加载 L/V	TDXDLL1(37, LOW, VOL, 0)
+38	计算并输出XG信号	TDXDLL1(38, 0, 0, 0)
+三步必须按顺序调用，缺一不可。ID=36 和 37 只负责存数据（输出0），ID=38 才输出计算结果。
+
 ---
 
 ## 十三、相关文档
