@@ -1,0 +1,111 @@
+{
+  "pluginName": "ExpressionIndicators",
+  "pluginDescription": "使用表达式语法的通达信指标插件",
+  "functions": [
+    {
+      "id": 1,
+      "name": "BollingerUpper",
+      "description": "布林带上轨 - MA + 2*STD",
+      "formulaType": "EXPRESSION",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 20,
+          "description": "周期"
+        }
+      ],
+      "expression": "MA(CLOSE, 20) + STD(CLOSE, 20) * 2"
+    },
+    {
+      "id": 2,
+      "name": "BollingerMiddle",
+      "description": "布林带中轨 - 简单均线",
+      "formulaType": "EXPRESSION",
+      "parameters": [],
+      "expression": "MA(CLOSE, 20)"
+    },
+    {
+      "id": 3,
+      "name": "BollingerLower",
+      "description": "布林带下轨 - MA - 2*STD",
+      "formulaType": "EXPRESSION",
+      "parameters": [],
+      "expression": "MA(CLOSE, 20) - STD(CLOSE, 20) * 2"
+    },
+    {
+      "id": 4,
+      "name": "PriceMomentum",
+      "description": "价格动量 - 当前价与N周期前的变化率",
+      "formulaType": "EXPRESSION",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 10,
+          "description": "周期"
+        }
+      ],
+      "expression": "(CLOSE - REF(CLOSE, 10)) / REF(CLOSE, 10) * 100"
+    },
+    {
+      "id": 5,
+      "name": "VolumeMA",
+      "description": "成交量均线",
+      "formulaType": "EXPRESSION",
+      "parameters": [],
+      "expression": "MA(VOL, 20)"
+    },
+    {
+      "id": 6,
+      "name": "GoldenCross",
+      "description": "金叉信号 - 5日均线上穿10日均线",
+      "formulaType": "EXPRESSION",
+      "parameters": [],
+      "expression": "CROSS(MA(CLOSE, 5), MA(CLOSE, 10))"
+    },
+    {
+      "id": 7,
+      "name": "RSILike",
+      "description": "类RSI指标 - 基于价格变动的动量",
+      "formulaType": "EXPRESSION",
+      "parameters": [],
+      "expression": "IF(CLOSE > REF(CLOSE, 1), CLOSE - REF(CLOSE, 1), 0) / (CLOSE - REF(CLOSE, 1)) * 100"
+    },
+    {
+      "id": 8,
+      "name": "WilliamsR",
+      "description": "威廉指标 - (H-C)/(H-L)*100",
+      "formulaType": "EXPRESSION",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 14,
+          "description": "周期"
+        }
+      ],
+      "expression": "(HHV(HIGH, 14) - CLOSE) / (HHV(HIGH, 14) - LLV(LOW, 14)) * 100"
+    },
+    {
+      "id": 9,
+      "name": "EMA_Cross",
+      "description": "EMA金叉信号",
+      "formulaType": "EXPRESSION",
+      "parameters": [],
+      "expression": "CROSS(EMA(CLOSE, 12), EMA(CLOSE, 26))"
+    },
+    {
+      "id": 10,
+      "name": "PriceDeviation",
+      "description": "价格偏离度 - 当前价相对均线的偏离百分比",
+      "formulaType": "EXPRESSION",
+      "parameters": [],
+      "expression": "(CLOSE - MA(CLOSE, 20)) / MA(CLOSE, 20) * 100"
+    }
+  ],
+  "security": {
+    "enableTimeLimit": false,
+    "expireYear": 2026,
+    "enableDeviceBinding": false,
+    "enableOnlineVerify": false,
+    "verifyUrl": null
+  }
+}

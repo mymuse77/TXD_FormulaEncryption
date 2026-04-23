@@ -86,6 +86,8 @@ public static class ConfigLoader
             {
                 EnableTimeLimit = false,
                 ExpireYear = 2026,
+                ExpireMonth = 12,
+                ExpireDay = 31,
                 EnableDeviceBinding = false,
                 EnableOnlineVerify = false
             }

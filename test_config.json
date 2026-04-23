@@ -1,0 +1,55 @@
+{
+  "pluginName": "MyTdxPlugin",
+  "pluginDescription": "\u6211\u7684\u901A\u8FBE\u4FE1\u516C\u5F0F\u63D2\u4EF6",
+  "functions": [
+    {
+      "id": 1,
+      "name": "MyMA",
+      "description": "\u81EA\u5B9A\u4E49N\u65E5\u5747\u7EBF",
+      "formulaType": "MA",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 10,
+          "description": "\u5747\u7EBF\u5468\u671F"
+        }
+      ],
+      "customCode": null
+    },
+    {
+      "id": 2,
+      "name": "MyEMA",
+      "description": "\u81EA\u5B9A\u4E49N\u65E5\u6307\u6570\u5747\u7EBF",
+      "formulaType": "EMA",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 12,
+          "description": "EMA\u5468\u671F"
+        }
+      ],
+      "customCode": null
+    },
+    {
+      "id": 3,
+      "name": "MyRSI",
+      "description": "\u81EA\u5B9A\u4E49RSI\u6307\u6807",
+      "formulaType": "RSI",
+      "parameters": [
+        {
+          "name": "period",
+          "defaultValue": 14,
+          "description": "RSI\u5468\u671F"
+        }
+      ],
+      "customCode": null
+    }
+  ],
+  "security": {
+    "enableTimeLimit": true,
+    "expireYear": 2026,
+    "enableDeviceBinding": true,
+    "enableOnlineVerify": false,
+    "verifyUrl": null
+  }
+}

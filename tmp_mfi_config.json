@@ -1,0 +1,14 @@
+{
+  "pluginName": "TmpMfi",
+  "pluginDescription": "tmp",
+  "functions": [
+    {
+      "id": 1,
+      "name": "MFI",
+      "description": "Money Flow Index",
+      "formulaType": "EXPRESSION",
+      "expression": "100-(100/(1+SUM(IF(((HIGH+LOW+CLOSE)/3)>REF((HIGH+LOW+CLOSE)/3,1),((HIGH+LOW+CLOSE)/3)*VOL,0),14)/SUM(IF(((HIGH+LOW+CLOSE)/3)<REF((HIGH+LOW+CLOSE)/3,1),((HIGH+LOW+CLOSE)/3)*VOL,0),14)))"
+    }
+  ],
+  "security": { "enableTimeLimit": false }
+}

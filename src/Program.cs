@@ -322,11 +322,28 @@ class Program
                     usedNames.Add(func.Name);
                 }
 
-                var validTypes = new[] { "MA", "EMA", "RSI", "MACD", "CUSTOM" };
+                var validTypes = new[] { "MA", "EMA", "RSI", "MACD", "CUSTOM", "EXPRESSION" };
                 if (!validTypes.Contains(func.FormulaType?.ToUpper()))
                 {
                     Console.WriteLine($"错误: 函数 '{func.Name}' 的公式类型无效: {func.FormulaType}");
                     isValid = false;
+                }
+
+                // 验证 EXPRESSION 类型必须有表达式
+                if (func.FormulaType?.ToUpper() == "EXPRESSION" && string.IsNullOrWhiteSpace(func.Expression))
+                {
+                    Console.WriteLine($"错误: 函数 '{func.Name}' 使用 EXPRESSION 类型但 expression 为空");
+                    isValid = false;
+                }
+
+                // 验证 EXPRESSION 表达式语法
+                if (func.FormulaType?.ToUpper() == "EXPRESSION" && !string.IsNullOrWhiteSpace(func.Expression))
+                {
+                    if (!ExpressionParser.Validate(func.Expression, out var error))
+                    {
+                        Console.WriteLine($"错误: 函数 '{func.Name}' 的表达式语法错误: {error}");
+                        isValid = false;
+                    }
                 }
             }
         }

@@ -10,6 +10,7 @@
 - **RSI** - 相对强弱指标
 - **MACD** - MACD指标
 - **CUSTOM** - 自定义C++代码
+- **EXPRESSION** - 通达信公式风格表达式 ⭐ 新功能
 
 ### 安全保护功能
 - ✅ 时间限制验证
@@ -47,6 +48,7 @@ dotnet run -- init -o myconfig.json
 
 打开 `myconfig.json` 编辑您的公式配置：
 
+**方式一：使用内置指标**
 ```json
 {
   "pluginName": "MyIndicators",
@@ -65,10 +67,31 @@ dotnet run -- init -o myconfig.json
         }
       ]
     }
-  ],
-  "security": {
-    "enableTimeLimit": false
-  }
+  ]
+}
+```
+
+**方式二：使用表达式（推荐）**
+```json
+{
+  "pluginName": "MyIndicators",
+  "pluginDescription": "我的技术指标",
+  "functions": [
+    {
+      "id": 1,
+      "name": "BollingerUpper",
+      "description": "布林带上轨",
+      "formulaType": "EXPRESSION",
+      "expression": "MA(CLOSE, 20) + STD(CLOSE, 20) * 2"
+    },
+    {
+      "id": 2,
+      "name": "GoldenCross",
+      "description": "金叉信号",
+      "formulaType": "EXPRESSION",
+      "expression": "CROSS(MA(CLOSE, 5), MA(CLOSE, 10))"
+    }
+  ]
 }
 ```
 
@@ -113,6 +136,41 @@ cmake --build . --config Release
 
 ### 完整配置示例 (JSON)
 
+**示例1：使用表达式（推荐）**
+```json
+{
+  "pluginName": "ExpressionIndicators",
+  "pluginDescription": "使用表达式的高级指标",
+  "functions": [
+    {
+      "id": 1,
+      "name": "BollingerUpper",
+      "description": "布林带上轨",
+      "formulaType": "EXPRESSION",
+      "expression": "MA(CLOSE, 20) + STD(CLOSE, 20) * 2"
+    },
+    {
+      "id": 2,
+      "name": "PriceMomentum",
+      "description": "价格动量",
+      "formulaType": "EXPRESSION",
+      "expression": "(CLOSE - REF(CLOSE, 10)) / REF(CLOSE, 10) * 100"
+    },
+    {
+      "id": 3,
+      "name": "GoldenCross",
+      "description": "金叉信号",
+      "formulaType": "EXPRESSION",
+      "expression": "CROSS(MA(CLOSE, 5), MA(CLOSE, 10))"
+    }
+  ],
+  "security": {
+    "enableTimeLimit": false
+  }
+}
+```
+
+**示例2：混合使用多种类型**
 ```json
 {
   "pluginName": "MyPremiumPlugin",
@@ -133,6 +191,13 @@ cmake --build . --config Release
     },
     {
       "id": 2,
+      "name": "BollingerBand",
+      "description": "布林带宽度",
+      "formulaType": "EXPRESSION",
+      "expression": "(MA(CLOSE, 20) + STD(CLOSE, 20) * 2) - (MA(CLOSE, 20) - STD(CLOSE, 20) * 2)"
+    },
+    {
+      "id": 3,
       "name": "MyCustom",
       "description": "自定义算法",
       "formulaType": "CUSTOM",
@@ -169,6 +234,26 @@ security:
   enableTimeLimit: false
 ```
 
+## 示例文件
+
+项目 `examples/` 目录包含多个示例配置：
+
+| 示例文件 | 说明 |
+|---------|------|
+| `basic-config.json` | 基础内置指标示例 (MA/EMA/RSI/MACD) |
+| `custom-code-config.json` | 自定义C++代码示例 |
+| `expression-config.json` | **表达式公式示例（推荐）** |
+| `security-config.json` | 安全功能配置示例 |
+
+使用示例：
+```bash
+# 验证表达式示例
+dotnet run -- validate -c examples/expression-config.json
+
+# 生成表达式项目
+dotnet run -- generate -c examples/expression-config.json -o ./MyExpressionPlugin
+```
+
 ## 命令行参数
 
 ```
@@ -199,6 +284,7 @@ Options for validate:
 | RSI | 相对强弱指标 | period: 周期 |
 | MACD | MACD指标 | 无（固定12,26,9） |
 | CUSTOM | 自定义代码 | customCode: C++代码 |
+| **EXPRESSION** | **表达式公式** | **expression: 公式表达式** |
 
 ## 自定义代码编写
 
@@ -215,6 +301,97 @@ Options for validate:
 - `nDataLen`: 数据长度
 - `pfOut`: 输出数组
 - `pfIn1`, `pfIn2`, `pfIn3`: 输入数组
+
+## 🆕 表达式公式（推荐）
+
+**EXPRESSION** 类型允许你使用通达信风格的公式语法，无需编写C++代码：
+
+### 基本示例
+
+```json
+{
+  "id": 1,
+  "name": "BollingerUpper",
+  "description": "布林带上轨",
+  "formulaType": "EXPRESSION",
+  "expression": "MA(CLOSE, 20) + STD(CLOSE, 20) * 2"
+}
+```
+
+### 支持的函数
+
+#### 数据序列
+- `CLOSE` / `C` - 收盘价
+- `OPEN` / `O` - 开盘价
+- `HIGH` / `H` - 最高价
+- `LOW` / `L` - 最低价
+- `VOL` / `V` - 成交量
+
+#### 技术指标
+- `MA(X, N)` - 简单移动平均
+- `EMA(X, N)` - 指数移动平均
+- `SMA(X, N, M)` - 加权移动平均
+- `STD(X, N)` - 标准差
+- `HHV(X, N)` - N周期最高值
+- `LLV(X, N)` - N周期最低值
+- `SUM(X, N)` - N周期求和
+- `REF(X, N)` - 引用N周期前的值
+
+#### 数学函数
+- `ABS(X)` - 绝对值
+- `MAX(A, B)` - 最大值
+- `MIN(A, B)` - 最小值
+- `SQRT(X)` - 平方根
+- `POW(X, N)` - 幂运算
+
+#### 逻辑函数
+- `IF(COND, A, B)` - 条件判断
+- `CROSS(A, B)` - 上穿判断
+- `AND`, `OR`, `NOT` - 逻辑运算
+
+### 运算符
+
+支持 `+`, `-`, `*`, `/`, `%` 以及比较运算符 `>`, `<`, `>=`, `<=`, `=`, `<>`
+
+### 完整示例：布林带
+
+```json
+{
+  "pluginName": "BollingerBands",
+  "functions": [
+    {
+      "id": 1,
+      "name": "BBUpper",
+      "formulaType": "EXPRESSION",
+      "expression": "MA(CLOSE, 20) + STD(CLOSE, 20) * 2"
+    },
+    {
+      "id": 2,
+      "name": "BBMiddle", 
+      "formulaType": "EXPRESSION",
+      "expression": "MA(CLOSE, 20)"
+    },
+    {
+      "id": 3,
+      "name": "BBLower",
+      "formulaType": "EXPRESSION",
+      "expression": "MA(CLOSE, 20) - STD(CLOSE, 20) * 2"
+    }
+  ]
+}
+```
+
+### 表达式 vs CUSTOM
+
+| 特性 | EXPRESSION | CUSTOM |
+|-----|-----------|--------|
+| 易用性 | ⭐⭐⭐ 简单 | ⭐ 需懂C++ |
+| 灵活性 | ⭐⭐⭐ 标准指标 | ⭐⭐⭐⭐⭐ 任意代码 |
+| 安全性 | ⭐⭐⭐ 自动验证 | ⭐⭐ 可能出错 |
+| 性能 | ⭐⭐⭐ 良好 | ⭐⭐⭐⭐⭐ 最优 |
+| 适合场景 | 标准指标组合 | 复杂算法 |
+
+**建议**：优先使用 EXPRESSION，复杂逻辑使用 CUSTOM。
 
 ## 安全功能实现
 

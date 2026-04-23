@@ -39,13 +39,16 @@ public class FunctionConfig
     public string Description { get; set; } = "";
 
     [JsonPropertyName("formulaType")]
-    public string FormulaType { get; set; } = "MA"; // MA, EMA, RSI, MACD, CUSTOM
+    public string FormulaType { get; set; } = "MA"; // MA, EMA, RSI, MACD, CUSTOM, EXPRESSION
 
     [JsonPropertyName("parameters")]
     public List<ParameterConfig> Parameters { get; set; } = new();
 
     [JsonPropertyName("customCode")]
     public string? CustomCode { get; set; }
+
+    [JsonPropertyName("expression")]
+    public string? Expression { get; set; }
 }
 
 /// <summary>
@@ -73,6 +76,12 @@ public class SecurityConfig
 
     [JsonPropertyName("expireYear")]
     public int ExpireYear { get; set; } = 2026;
+
+    [JsonPropertyName("expireMonth")]
+    public int ExpireMonth { get; set; } = 12;
+
+    [JsonPropertyName("expireDay")]
+    public int ExpireDay { get; set; } = 31;
 
     [JsonPropertyName("enableDeviceBinding")]
     public bool EnableDeviceBinding { get; set; }
