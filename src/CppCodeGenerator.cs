@@ -146,15 +146,27 @@ public class CppCodeGenerator
 
         // 检查是否有 useGlobalData 的函数，需要生成全局数据缓冲区
         bool needsGlobalData = _config.Functions.Any(f => f.UseGlobalData);
-        if (needsGlobalData)
+        var allExportVars = _config.Functions
+            .SelectMany(f => f.ExportInternalVars ?? new List<string>())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (needsGlobalData || allExportVars.Any())
         {
             sb.AppendLine("// ==================== 全局数据缓冲区 ====================");
             sb.AppendLine("// 用于多步数据加载：DATALOADER函数存储数据，计算函数从全局数组读取");
-            sb.AppendLine("static std::vector<float> g_buf_close;  // CLOSE/C");
-            sb.AppendLine("static std::vector<float> g_buf_open;   // OPEN/O");
-            sb.AppendLine("static std::vector<float> g_buf_high;   // HIGH/H");
-            sb.AppendLine("static std::vector<float> g_buf_low;    // LOW/L");
-            sb.AppendLine("static std::vector<float> g_buf_vol;    // VOL/V");
+            if (needsGlobalData)
+            {
+                sb.AppendLine("static std::vector<float> g_buf_close;  // CLOSE/C");
+                sb.AppendLine("static std::vector<float> g_buf_open;   // OPEN/O");
+                sb.AppendLine("static std::vector<float> g_buf_high;   // HIGH/H");
+                sb.AppendLine("static std::vector<float> g_buf_low;    // LOW/L");
+                sb.AppendLine("static std::vector<float> g_buf_vol;    // VOL/V");
+            }
+            foreach (var varName in allExportVars)
+            {
+                sb.AppendLine($"static std::vector<float> g_export_{varName.ToLowerInvariant()};  // 导出: {varName}");
+            }
             sb.AppendLine();
         }
 
@@ -970,6 +982,9 @@ public class CppCodeGenerator
             case "EXPRESSION":
                 GenerateExpressionCode(sb, func);
                 break;
+            case "EXPORTREADER":
+                GenerateExportReaderCode(sb, func);
+                break;
             default:
                 sb.AppendLine("    // TODO: 实现算法");
                 sb.AppendLine("    for (int i = 0; i < nDataLen; i++)");
@@ -1037,6 +1052,7 @@ public class CppCodeGenerator
 
             // 生成代码
             var generator = new ExpressionCodeGenerator(func.Name, func.UseGlobalData);
+            generator.SetExportVars(func.ExportInternalVars);
             var code = generator.GenerateFunctionCode(ast);
 
             // 输出代码
@@ -1052,6 +1068,32 @@ public class CppCodeGenerator
             sb.AppendLine($"    // 代码生成错误: {ex.Message.Replace("\n", " ").Replace("\r", "")}");
             sb.AppendLine("    for (int i = 0; i < nDataLen; i++) pfOut[i] = 0;");
         }
+    }
+
+    /// <summary>
+    /// 生成导出变量读取函数代码
+    /// </summary>
+    private void GenerateExportReaderCode(StringBuilder sb, FunctionConfig func)
+    {
+        var varName = func.Expression?.Trim() ?? "";
+        if (string.IsNullOrEmpty(varName))
+        {
+            sb.AppendLine("    // 错误: EXPORTREADER 未指定变量名");
+            sb.AppendLine("    for (int i = 0; i < nDataLen; i++) pfOut[i] = 0;");
+            return;
+        }
+        var exportName = $"g_export_{varName.ToLowerInvariant()}";
+        sb.AppendLine($"    // EXPORTREADER: 从全局缓冲区读取导出的 {varName}");
+        sb.AppendLine("    if (nDataLen <= 0 || pfOut == nullptr) return;");
+        sb.AppendLine($"    if ({exportName}.size() >= (size_t)nDataLen) {{");
+        sb.AppendLine("        for (int i = 0; i < nDataLen; i++)");
+        sb.AppendLine($"            pfOut[i] = {exportName}[i];");
+        sb.AppendLine("    } else {");
+        sb.AppendLine("        for (int i = 0; i < nDataLen; i++) pfOut[i] = 0.0f;");
+        sb.AppendLine("    }");
+        sb.AppendLine("    // 安全腐蚀");
+        sb.AppendLine("    for (int i = 0; i < nDataLen; i++)");
+        sb.AppendLine("        pfOut[i] = ObfuscateResult(pfOut[i]);");
     }
 
     /// <summary>

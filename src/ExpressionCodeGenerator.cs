@@ -17,12 +17,18 @@ public class ExpressionCodeGenerator
     private readonly HashSet<string> _generatedHelpers = new();
     // 用户变量名 -> C++数组名 的映射
     private readonly Dictionary<string, string> _variableMap = new(StringComparer.OrdinalIgnoreCase);
+    private List<string> _exportVars = new();
 
     public ExpressionCodeGenerator(string funcName, bool useGlobalData = false)
     {
         _sb = new StringBuilder();
         _funcName = funcName;
         _useGlobalData = useGlobalData;
+    }
+
+    public void SetExportVars(List<string>? vars)
+    {
+        _exportVars = vars ?? new List<string>();
     }
 
     /// <summary>
@@ -112,6 +118,23 @@ public class ExpressionCodeGenerator
         {
             _sb.AppendLine($"    for (int i = 0; i < nDataLen; i++)");
             _sb.AppendLine($"        pfOut[i] = {resultVar}[i];");
+        }
+
+        // 导出内部变量到全局缓冲区
+        if (_exportVars.Count > 0)
+        {
+            _sb.AppendLine();
+            _sb.AppendLine("    // 导出内部变量到全局缓冲区（供通达信公式使用）");
+            foreach (var varName in _exportVars)
+            {
+                var upperVar = varName.ToUpperInvariant();
+                if (_variableMap.TryGetValue(upperVar, out var cppVar))
+                {
+                    var exportName = $"g_export_{varName.ToLowerInvariant()}";
+                    _sb.AppendLine($"    {exportName}.resize(nDataLen);");
+                    _sb.AppendLine($"    for (int i = 0; i < nDataLen; i++) {exportName}[i] = {cppVar}[i];");
+                }
+            }
         }
 
         // 应用安全腐蚀

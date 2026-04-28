@@ -79,6 +79,14 @@ public class FunctionConfig
     /// </summary>
     [JsonPropertyName("outputVariableName")]
     public string? OutputVariableName { get; set; }
+
+    /// <summary>
+    /// 需要导出到全局缓冲区的内部变量名列表
+    /// 这些变量在DLL计算完成后会写入全局数组，可通过EXPORTREADER类型函数在通达信中读取
+    /// 用于支持DRAWSL等依赖内部变量的绘图指令
+    /// </summary>
+    [JsonPropertyName("exportInternalVars")]
+    public List<string> ExportInternalVars { get; set; } = new();
 }
 
 /// <summary>

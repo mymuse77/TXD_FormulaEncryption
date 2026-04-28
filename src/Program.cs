@@ -322,7 +322,7 @@ class Program
                     usedNames.Add(func.Name);
                 }
 
-                var validTypes = new[] { "MA", "EMA", "RSI", "MACD", "CUSTOM", "EXPRESSION", "DATALOADER" };
+                var validTypes = new[] { "MA", "EMA", "RSI", "MACD", "CUSTOM", "EXPRESSION", "DATALOADER", "EXPORTREADER" };
                 if (!validTypes.Contains(func.FormulaType?.ToUpper()))
                 {
                     Console.WriteLine($"错误: 函数 '{func.Name}' 的公式类型无效: {func.FormulaType}");

@@ -80,11 +80,22 @@ public class TdxFormulaGenerator
             ? targetFunc.OutputVariableName
             : targetFunc.Name;
 
+        // 查找导出读取函数
+        var exportReaders = _config.Functions
+            .Where(f => f.FormulaType?.ToUpper() == "EXPORTREADER")
+            .ToList();
+
+        // 收集可用的导出变量
+        var availableExports = exportReaders
+            .Select(f => f.Expression?.Trim()?.ToUpperInvariant() ?? "")
+            .Where(s => !string.IsNullOrEmpty(s))
+            .ToHashSet();
+
         var sb = new StringBuilder();
         sb.AppendLine($"{{=== {targetFunc.Name} - DLL保护版 ===}}");
         sb.AppendLine();
 
-        // 1. 生成数据加载调用（DATALOADER 类型函数）
+        // 1. 生成数据加载调用（DATALOADER / CUSTOM数据加载 类型函数）
         var dataLoaders = FindDataLoaders(targetFunc);
         if (dataLoaders.Any())
         {
@@ -92,7 +103,8 @@ public class TdxFormulaGenerator
             foreach (var loader in dataLoaders)
             {
                 var call = BuildDllCall(loader, dllPrefix);
-                sb.AppendLine($"_L{loader.Id}: {call}*0;");
+                // 使用 := 定义中间变量，避免输出到图表且确保调用不被优化
+                sb.AppendLine($"_L{loader.Id}:= {call};");
             }
             sb.AppendLine();
         }
@@ -100,26 +112,38 @@ public class TdxFormulaGenerator
         // 2. 生成核心信号调用
         sb.AppendLine("{ 核心信号 - DLL保护 }");
         var targetCall = BuildDllCall(targetFunc, dllPrefix);
-        sb.AppendLine($"{outputVar}: {targetCall};");
+        sb.AppendLine($"{outputVar}: {targetCall}, NODRAW;");
         sb.AppendLine();
 
-        // 3. 生成简化的辅助变量（用于绘图着色）
+        // 3. 生成导出变量读取（用于 DRAWSL 等）
+        if (exportReaders.Any())
+        {
+            sb.AppendLine("{ DLL导出变量读取（用于DRAWSL等绘图指令）}");
+            foreach (var reader in exportReaders)
+            {
+                var varName = reader.Expression?.Trim() ?? reader.Name;
+                sb.AppendLine($"{varName}: {dllPrefix}({reader.Id}, 0, 0, 0), NODRAW;");
+            }
+            sb.AppendLine();
+        }
+
+        // 4. 生成简化的辅助变量（用于绘图着色）
         sb.AppendLine("{ 涨停/跌停/炸板判断（简化版，仅用于着色）}");
         sb.AppendLine("ZT:=C=H AND C>=REF(C,1)*1.1;");
         sb.AppendLine("DT:=C=L AND C<=REF(C,1)*0.9;");
         sb.AppendLine("ZB:=C<H AND H>=REF(C,1)*1.1;");
         sb.AppendLine();
 
-        // 4. 输出绘图指令
+        // 5. 输出绘图指令
         if (drawingCommands.Any())
         {
             sb.AppendLine("{ ========== 绘图指令 ========== }");
             foreach (var cmd in drawingCommands)
             {
-                // 过滤掉依赖 DLL 内部变量的绘图指令（如 DRAWSL 引用 NN1/NN3 等）
-                if (ContainsInternalVar(cmd))
+                // 过滤掉依赖未导出内部变量的绘图指令
+                if (ContainsInternalVar(cmd, availableExports))
                 {
-                    sb.AppendLine($"{{ 已省略: {cmd} (依赖DLL内部变量) }}");
+                    sb.AppendLine($"{{ 已省略: {cmd} (依赖未导出的DLL内部变量) }}");
                     continue;
                 }
 
@@ -223,15 +247,13 @@ public class TdxFormulaGenerator
     /// </summary>
     private string ReplaceSignalVariables(string command, string outputVar)
     {
-        // 简单替换：XG, XG1, XG2 等统一替换为 outputVar
-        // 注意避免替换变量名中的一部分（如 XGA → 不应替换）
+        // 只替换 XG（最终信号），不替换 XG1/XG2（子信号由 EXPORTREADER 提供）
         var sb = new StringBuilder();
         int i = 0;
         while (i < command.Length)
         {
-            // 检查是否是 XG, XG1, XG2 等信号变量
             bool replaced = false;
-            var candidates = new[] { "XG2", "XG1", "XG" };
+            var candidates = new[] { "XG" };
             foreach (var cand in candidates)
             {
                 if (i + cand.Length <= command.Length &&
@@ -264,14 +286,17 @@ public class TdxFormulaGenerator
     private bool IsVarChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 
     /// <summary>
-    /// 检查绘图指令是否包含 DLL 内部变量（如 NN1, NN3, BYN 等）
-    /// 这些变量只在 DLL 内部计算，通达信公式中无法访问
+    /// 检查绘图指令是否包含未导出的 DLL 内部变量（如 NN1, NN3, BYN 等）
+    /// 如果变量已通过 EXPORTREADER 导出，则认为可用
     /// </summary>
-    private bool ContainsInternalVar(string command)
+    private bool ContainsInternalVar(string command, HashSet<string> availableExports)
     {
         var internalVars = new[] { "NN1", "NN2", "NN3", "NN4", "NN5", "BYN" };
         foreach (var varName in internalVars)
         {
+            if (availableExports.Contains(varName))
+                continue; // 该变量已通过 EXPORTREADER 导出，可用
+
             int idx = 0;
             while ((idx = command.IndexOf(varName, idx)) >= 0)
             {
@@ -292,11 +317,13 @@ public class TdxFormulaGenerator
     {
         var result = new List<FunctionConfig>();
 
-        // 如果目标函数使用全局数据，则需要找到所有 DATALOADER 函数
+        // 如果目标函数使用全局数据，则需要找到所有数据加载函数
+        // 包括 DATALOADER 类型，以及名称以 LoadData 开头的 CUSTOM 类型
         if (targetFunc.UseGlobalData)
         {
             var loaders = _config.Functions
-                .Where(f => f.FormulaType?.ToUpper() == "DATALOADER")
+                .Where(f => f.FormulaType?.ToUpper() == "DATALOADER" ||
+                           (f.FormulaType?.ToUpper() == "CUSTOM" && f.Name?.StartsWith("LoadData") == true))
                 .OrderBy(f => f.Id)
                 .ToList();
             result.AddRange(loaders);
@@ -315,13 +342,23 @@ public class TdxFormulaGenerator
         var param2 = "0";
         var param3 = "0";
 
-        if (func.FormulaType?.ToUpper() == "DATALOADER")
+        if (func.FormulaType?.ToUpper() == "DATALOADER" ||
+            (func.FormulaType?.ToUpper() == "CUSTOM" && func.Name?.StartsWith("LoadData") == true))
         {
             // 数据加载函数使用实际数据参数
-            // 根据ID推断加载的数据类型
-            param1 = "CLOSE";
-            param2 = "OPEN";
-            param3 = "HIGH";
+            // 根据名称或描述推断加载的数据类型
+            if (func.Name == "LoadData2" || func.Description?.Contains("LOW/VOL") == true)
+            {
+                param1 = "LOW";
+                param2 = "VOL";
+                param3 = "0";
+            }
+            else
+            {
+                param1 = "CLOSE";
+                param2 = "OPEN";
+                param3 = "HIGH";
+            }
         }
         else if (func.UseGlobalData)
         {
