@@ -1352,11 +1352,12 @@ public class ExpressionCodeGenerator
     private string GenerateCODELIKE(AstNode node, string targetVar)
     {
         // CODELIKE('XX') - 检测股票代码前缀，返回0或1
-        // DLL 运行时无法获取股票代码，使用默认值（编译时无法确定市场）
-        // 默认返回 0，用户可在使用时通过参数传入市场标识
+        // DLL 运行时无法获取股票代码，默认返回 1（假设所有股票都匹配）
+        // 这样 X1 会取第一个 IF 分支的值（0.1），所有股票按 10% 涨跌幅计算
+        // 对于创业板(20%)和北交所(30%)，10%阈值仍能使 ZT/ZB 判断正确（因为实际涨幅更大）
         var codeStr = node.Children[0].Value ?? "";
-        _sb.AppendLine($"    // CODELIKE('{codeStr}') - market detection (default 0, pass via parameter if needed)");
-        _sb.AppendLine($"    for (int i = 0; i < nDataLen; i++) {targetVar}[i] = 0.0f;");
+        _sb.AppendLine($"    // CODELIKE('{codeStr}') - market detection (default 1, all stocks treated as matching)");
+        _sb.AppendLine($"    for (int i = 0; i < nDataLen; i++) {targetVar}[i] = 1.0f;");
         return targetVar;
     }
 

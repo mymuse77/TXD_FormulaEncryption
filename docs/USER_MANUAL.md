@@ -732,7 +732,10 @@ dotnet run --project src\TdxDllGenerator.csproj -- validate -c myconfig.json
 dotnet run --project src\TdxDllGenerator.csproj -- generate -c myconfig.json -o ./output
 
 # 创建默认配置
-dotnet run --project src\TdxDllGenerator.csproj -- init -o myconfig.json
+# dotnet run --project src\TdxDllGenerator.csproj -- init -o myconfig.json
+
+# 编译插件
+# C:\mingw64\bin\g++.exe -shared -o MyTest.dll MyTest.cpp MyTest.def -m32 -O2 -static-libgcc -static-libstdc++
 
 # 查看帮助
 dotnet run --project src\TdxDllGenerator.csproj -- --help

@@ -17,6 +17,13 @@ public class TdxFormulaConfig
     [JsonPropertyName("pluginDescription")]
     public string PluginDescription { get; set; } = "通达信自定义公式插件";
 
+    /// <summary>
+    /// DLL绑定槽位号（通达信中绑定到第几个DLL，如1表示TDXDLL1，2表示TDXDLL2）
+    /// 默认值为1
+    /// </summary>
+    [JsonPropertyName("dllSlot")]
+    public int DllSlot { get; set; } = 1;
+
     [JsonPropertyName("functions")]
     public List<FunctionConfig> Functions { get; set; } = new();
 
@@ -57,6 +64,21 @@ public class FunctionConfig
     /// </summary>
     [JsonPropertyName("useGlobalData")]
     public bool UseGlobalData { get; set; }
+
+    /// <summary>
+    /// 原始通达信公式文件路径（相对或绝对路径）
+    /// 如果提供，生成器会自动提取绘图指令，生成可直接粘贴到通达信的最终公式文件
+    /// </summary>
+    [JsonPropertyName("originalFormulaFile")]
+    public string? OriginalFormulaFile { get; set; }
+
+    /// <summary>
+    /// 此函数在通达信中对应的输出变量名
+    /// 用于生成最终公式时替换原始公式中的信号变量
+    /// 例如："低吸信号"
+    /// </summary>
+    [JsonPropertyName("outputVariableName")]
+    public string? OutputVariableName { get; set; }
 }
 
 /// <summary>

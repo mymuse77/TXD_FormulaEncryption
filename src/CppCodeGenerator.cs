@@ -48,6 +48,10 @@ public class CppCodeGenerator
         // 生成编译说明
         GenerateBuildInstructions();
 
+        // 生成通达信最终公式文件（如果配置了 originalFormulaFile）
+        var formulaGenerator = new TdxFormulaGenerator(_config, _outputPath);
+        formulaGenerator.GenerateAllFormulas();
+
         Console.WriteLine($"项目已生成到: {_outputPath}");
         Console.WriteLine($"插件名称: {_config.PluginName}");
         Console.WriteLine($"函数数量: {_config.Functions.Count}");
